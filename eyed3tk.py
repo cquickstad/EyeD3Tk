@@ -1,11 +1,29 @@
 #!/usr/bin/env python3
 
+
+# EyeD3Tk  <https://github.com/cquickstad/EyeD3Tk>
+# Copyright (C) 2018  Chad Quickstad
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
 from argparse import ArgumentParser
 from eyed3 import load
-from eyed3.id3 import Genre
+from eyed3.id3 import Genre, ID3_DEFAULT_VERSION
 from eyed3.id3.frames import ImageFrame
-from tkinter import Tk, Label, Button, Entry, Frame, StringVar, filedialog, LEFT, CENTER, RIGHT, X, END, DISABLED, \
-    NORMAL
+from tkinter import Tk, Label, Button, Entry, Frame, StringVar, filedialog, \
+    LEFT, CENTER, RIGHT, X, END, DISABLED, NORMAL
 from PIL import ImageTk, Image
 from io import BytesIO
 from os.path import isfile
@@ -28,10 +46,57 @@ class MainWindow:
     img_file_types = [('ID3-Compatible Images', '*.jpg *.JPG *.jpeg *.JPEG *.png *.PNG'),
                       ('All Files', "*")]
 
+    id3_gui_fields = (('title', "Title:"),
+                      ('artist', "Artist:"),
+                      ('composer', "Composer:"),
+                      ('album', "Album:"),
+                      ('album_artist', "Album Artist:"),
+                      ('original_release_date', "Original Release Date:"),
+                      ('release_date', "Release Date:"),
+                      ('recording_date', "Recording Date:"),
+                      ('track_num', "Track:"),
+                      ('num_tracks', "Tracks in Album:"),
+                      ('genre', "Genre:"),
+                      ('comments', "Comments:"))
+
     def __init__(self, root, cmd_line_mp3_file):
+        self.cmd_line_mp3_file = cmd_line_mp3_file
         self.master = root
         self.master.title(app_title)
 
+        self.file_frame, self.file_button, self.mp3_file_sv, self.file_entry = None, None, None, None
+        self.build_mp3_file_frame()
+
+        self.id3_section_frame, self.id3_section_label = None, None
+        self.build_id3_section_frame()
+
+        self.id3_frame = dict()
+        self.id3_entry = dict()
+        self.id3_label = dict()
+        for field, text in self.id3_gui_fields:
+            self.create_id3_field_gui_element(field, text)
+
+        self.front_cover_frame, self.image_description_sv = None, None
+        self.image_dimension_label, self.extract_image_button = None, None
+        self.build_front_cover_frame()
+
+        self.new_front_cover_frame, self.new_front_cover_button, self.remove_button = None, None, None
+        self.new_front_cover_sv, self.new_front_cover_entry = None, None
+        self.build_new_front_cover_frame()
+
+        self.save_button = None
+        self.build_save_button()
+
+        self.tk_label_for_img = None
+        self.audio_file = None
+        self.tk_img = None
+        self.image_file = None
+
+        self.fld_val = dict()
+
+        self.open_cmd_line_file()
+
+    def build_mp3_file_frame(self):
         self.file_frame = Frame(self.master)
         self.file_frame.pack(fill=X)
 
@@ -44,42 +109,26 @@ class MainWindow:
         self.file_entry.pack(fill=X)
         self.mp3_file_sv.set("...select a file...")
 
+    def build_id3_section_frame(self):
         self.id3_section_frame = Frame(self.master)
         self.id3_section_frame.pack(fill=X)
 
         self.id3_section_label = Label(self.id3_section_frame, text="--- ID3 Tag ---", justify=CENTER)
         self.id3_section_label.pack(fill=X)
 
-        self.id3_frame = dict()
-        self.id3_entry = dict()
-        self.id3_label = dict()
-
-        self.create_ide_element('title', "Title:")
-        self.create_ide_element('artist', "Artist:")
-        self.create_ide_element('composer', "Composer:")
-        self.create_ide_element('album', "Album:")
-        self.create_ide_element('album_artist', "Album Artist:")
-        self.create_ide_element('original_release_date', "Original Release Date:")
-        self.create_ide_element('release_date', "Release Date:")
-        self.create_ide_element('recording_date', "Recording Date:")
-        self.create_ide_element('track_num', "Track:")
-        self.create_ide_element('num_tracks', "Tracks in Album:")
-        self.create_ide_element('genre', "Genre:")
-        self.create_ide_element('comments', "Comments:")
-
+    def build_front_cover_frame(self):
         self.front_cover_frame = Frame(self.master)
         self.front_cover_frame.pack(fill=X)
-
-        self.front_cover_img = None
 
         self.image_description_sv = StringVar()
         self.image_description_sv.set(self.no_img_txt)
         self.image_dimension_label = Label(self.front_cover_frame, textvariable=self.image_description_sv)
         self.image_dimension_label.pack()
         self.extract_image_button = Button(self.front_cover_frame, text="Extract All Images to Files",
-                                           state=DISABLED, command=self.extract_images_action)
+                                           state=DISABLED, command=self.extract_images_button_action)
         self.extract_image_button.pack()
 
+    def build_new_front_cover_frame(self):
         self.new_front_cover_frame = Frame(self.master)
         self.new_front_cover_frame.pack(fill=X)
 
@@ -90,26 +139,25 @@ class MainWindow:
                                     command=self.remove_button_action)
         self.remove_button.pack(side=RIGHT)
         self.new_front_cover_sv = StringVar()
-        self.new_front_cover_sv.set("... select a file ...")
         self.new_front_cover_entry = Entry(self.new_front_cover_frame, width=50, textvariable=self.new_front_cover_sv)
         self.new_front_cover_entry.bind('<Return>', lambda _: self.img_entry_return_key_action())
         self.new_front_cover_entry.pack(fill=X)
 
+    def build_save_button(self):
         self.save_button = Button(self.master, text="Save to MP3 File", command=self.save_button_action)
         self.save_button.pack(fill=X)
 
-        self.audio_file = None
-        self.tk_img = None
-        self.image_file = None
-
-        if len(cmd_line_mp3_file) > 0:
-            if isfile(cmd_line_mp3_file):
-                self.mp3_file_sv.set(cmd_line_mp3_file)
+    def open_cmd_line_file(self):
+        if len(self.cmd_line_mp3_file) == 0:
+            self.new_front_cover_sv.set("... select a file ...")
+        else:
+            if isfile(self.cmd_line_mp3_file):
+                self.mp3_file_sv.set(self.cmd_line_mp3_file)
                 self.open_mp3_file()
             else:
-                self.mp3_file_sv.set("Invalid file path: " + cmd_line_mp3_file)
+                self.mp3_file_sv.set("Invalid file path: '" + self.cmd_line_mp3_file + "'")
 
-    def create_ide_element(self, name, text):
+    def create_id3_field_gui_element(self, name, text):
         self.id3_frame[name] = Frame(self.master)
         self.id3_frame[name].pack(fill=X)
         self.id3_label[name] = Label(self.id3_frame[name], text=text, anchor='e', width=17)
@@ -129,146 +177,160 @@ class MainWindow:
             self.display_image_file()
         self.put_new_image_into_tag()
 
-    def extract_images_action(self):
-        try:
-            for info in self.audio_file.tag.images:
-                image_io_stream = BytesIO(info.image_data)
-                img = Image.open(image_io_stream)
-                extension = "." + str(img.format).lower()
-                id3_img_name = ID3_IMG_TYPES[info.picture_type]
-                if info.description != "":
-                    id3_img_name = info.description + '.' + id3_img_name
-                image_save_path = filedialog.asksaveasfilename(parent=self.front_cover_frame,
-                                                               defaultextension=extension, initialfile=id3_img_name)
-                if image_save_path is None or image_save_path == "":
-                    continue
+    def extract_images_button_action(self):
+        self.try_to_extract_id3_images_to_files()
 
-                with open(image_save_path, 'wb') as img_file:
-                    img_file.write(info.image_data)
+    def try_to_extract_id3_images_to_files(self):
+        try:
+            self.extract_id3_images_to_files()
         except AttributeError:
             pass
 
+    def extract_id3_images_to_files(self):
+        for info in self.audio_file.tag.images:
+            self.extract_id3_image_to_file(info)
+
+    def extract_id3_image_to_file(self, info):
+        path = filedialog.asksaveasfilename(parent=self.front_cover_frame,
+                                            defaultextension=self.get_image_file_extension(info),
+                                            initialfile=self.get_initial_image_file_name(info))
+        if path is not None and path != "":
+            with open(path, 'wb') as img_file:
+                img_file.write(info.image_data)
+
+    def get_image_file_extension(self, info):
+        img = Image.open(BytesIO(info.image_data))
+        return "." + str(img.format).lower()
+
+    def get_initial_image_file_name(self, info):
+        name = ID3_IMG_TYPES[info.picture_type]
+        if info.description != "":
+            name = info.description + '.' + name
+        return name
+
     def open_mp3_file(self):
-        self.clear_elements()
+        self.clear_gui_tag_entry_elements()
+        self.try_to_open_mp3_file()
+        if self.audio_file:
+            self.load_tag_into_gui()
+
+    def try_to_open_mp3_file(self):
         try:
             self.audio_file = load(self.file_entry.get())
         except IOError:
+            self.audio_file = None
             self.mp3_file_sv.set("No file selected!")
-            return
-        self.put_tag_fields_in_entries()
-        self.open_id3_tag_image_as_file_io()
+
+    def load_tag_into_gui(self):
+        self.put_tag_fields_in_gui_entries()
+        self.try_to_open_id3_tag_image_as_file_io()
         if self.image_file is None:
-            self.clear_image()
+            self.clear_image_from_gui()
         else:
             self.display_image_file()
 
-    def tag_to_str(self, tag_element):
-        if tag_element is None:
-            tag_element = ""
-        tag_element = str(tag_element)
-        return tag_element
-
     def save_button_action(self):
-        assert self.audio_file is not None
+
+        self.gui_fields_to_fld_val()
+
+        tag = self.get_initialized_id3_tag()
+        tag.version = ID3_DEFAULT_VERSION
+
+        # These fields are assigned normally
+        tag.title = self.fld_val['title']
+        tag.artist = self.fld_val['artist']
+        tag.composer = self.fld_val['composer']
+        tag.album = self.fld_val['album']
+        tag.album_artist = self.fld_val['album_artist']
+        tag.original_release_date = self.fld_val['original_release_date']
+        tag.release_date = self.fld_val['release_date']
+        tag.recording_date = self.fld_val['recording_date']
+
+        # These fields need some converting or special assignments
+        tag.genre = Genre(self.fld_val['genre'])
+        tag.track_num = (self.fld_val['track_num'], self.fld_val['num_tracks'])
+        tag.comments.set(self.fld_val['comments'])
+
+        tag.save(encoding="utf_8")
+
+    def init_id3_tag(self):
         if self.audio_file.tag is None:
             self.audio_file.initTag()
-        tag = self.audio_file.tag
-        assert tag is not None
 
-        title = self.id3_entry['title'].get()
-        artist = self.id3_entry['artist'].get()
-        composer = self.id3_entry['composer'].get()
-        album = self.id3_entry['album'].get()
-        album_artist = self.id3_entry['album_artist'].get()
-        track_num = self.id3_entry['track_num'].get()
-        num_tracks = self.id3_entry['num_tracks'].get()
-        original_release_date = self.id3_entry['original_release_date'].get()
-        release_date = self.id3_entry['release_date'].get()
-        recording_date = self.id3_entry['recording_date'].get()
-        comments = self.id3_entry['comments'].get()
-        genre = self.id3_entry['genre'].get()
-
-        tag.version = (2, 4, 0)
-        tag.title = None if len(title) == 0 else title
-        tag.artist = None if len(artist) == 0 else artist
-        tag.composer = None if len(composer) == 0 else composer
-        tag.album = None if len(album) == 0 else album
-        tag.album_artist = None if len(album_artist) == 0 else album_artist
-        tag.genre = None if len(genre) == 0 else Genre(genre)
-
-        track_num = None if len(track_num) == 0 else int(track_num)
-        num_tracks = None if len(num_tracks) == 0 else int(num_tracks)
-        if track_num == 0:
-            track_num = None
-        if num_tracks == 0:
-            num_tracks = None
-        tag.track_num = (track_num, num_tracks)
-
-        tag.original_release_date = None if len(original_release_date) == 0 else original_release_date
-        tag.release_date = None if len(release_date) == 0 else release_date
-        tag.release_date = None if len(release_date) == 0 else release_date
-        tag.recording_date = None if len(recording_date) == 0 else recording_date
-
-        tag.comments.set(None if len(comments) == 0 else comments)
-
-        tag.save()
-
-    def clear_elements(self):
+    def clear_gui_tag_entry_elements(self):
         for key, entry in self.id3_entry.items():
             entry.delete(0, END)
-        self.clear_image()
+        self.clear_image_from_gui()
 
-    def clear_image(self):
+    def clear_image_from_gui(self):
         self.image_description_sv.set(self.no_img_txt)
         self.extract_image_button['state'] = DISABLED
-        if self.front_cover_img is not None:
-            self.front_cover_img.pack_forget()
+        if self.tk_label_for_img is not None:
+            self.tk_label_for_img.pack_forget()
 
-    def put_tag_fields_in_entries(self):
+    def put_tag_fields_in_gui_entries(self):
+        if self.audio_file.tag:
+            self.id3_tag_to_fld_val()
+            self.fld_val_to_gui_fields()
+
+    def id3_tag_to_fld_val(self):
         tag = self.audio_file.tag
-        if tag is None:
-            return
-        self.id3_entry['title'].insert(0, self.tag_to_str(tag.title))
-        self.id3_entry['artist'].insert(0, self.tag_to_str(tag.artist))
-        self.id3_entry['composer'].insert(0, self.tag_to_str(tag.composer))
-        self.id3_entry['album'].insert(0, self.tag_to_str(tag.album))
-        self.id3_entry['album_artist'].insert(0, self.tag_to_str(tag.album_artist))
-        self.id3_entry['genre'].insert(0, tag.genre.name if tag.genre is not None else "")
-        if len(tag.track_num) > 1:
-            self.id3_entry['track_num'].insert(0, self.tag_to_str(tag.track_num[0]))
-            self.id3_entry['num_tracks'].insert(0, self.tag_to_str(tag.track_num[1]))
-        self.id3_entry['original_release_date'].insert(0, self.tag_to_str(tag.original_release_date))
-        self.id3_entry['release_date'].insert(0, self.tag_to_str(tag.release_date))
-        self.id3_entry['recording_date'].insert(0, self.tag_to_str(tag.recording_date))
-        comments_accessor = tag.comments.get(description="")
-        if comments_accessor is not None:
-            self.id3_entry['comments'].insert(0, self.tag_to_str(comments_accessor.text))
+        self.fld_val['title'] = self.tag_to_str(tag.title)
+        self.fld_val['artist'] = self.tag_to_str(tag.artist)
+        self.fld_val['composer'] = self.tag_to_str(tag.composer)
+        self.fld_val['album'] = self.tag_to_str(tag.album)
+        self.fld_val['album_artist'] = self.tag_to_str(tag.album_artist)
+        self.fld_val['original_release_date'] = self.tag_to_str(tag.original_release_date)
+        self.fld_val['release_date'] = self.tag_to_str(tag.release_date)
+        self.fld_val['recording_date'] = self.tag_to_str(tag.recording_date)
+
+        self.fld_val['genre'] = "" if tag.genre is None else tag.genre.name
+        self.fld_val['track_num'] = "" if tag.track_num is None or len(tag.track_num) < 1 else tag.track_num[0]
+        self.fld_val['num_tracks'] = "" if tag.track_num is None or len(tag.track_num) < 2 else tag.track_num[1]
+        self.id3_comments_to_fld_val()
+
+    def tag_to_str(self, tag_element):
+        return "" if tag_element is None else str(tag_element)
+
+    def id3_comments_to_fld_val(self):
+        self.fld_val['comments'] = ""
+        for comment_accessor in self.audio_file.tag.comments:
+            if comment_accessor.description != "":
+                self.fld_val['comments'] += comment_accessor.description + ": "
+            self.fld_val['comments'] += self.tag_to_str(comment_accessor.text)
+
+    def fld_val_to_gui_fields(self):
+        for field, _ in self.id3_gui_fields:
+            self.id3_entry[field].insert(0, self.fld_val[field])
 
     def display_image_file(self):
         img = Image.open(self.image_file)
         original_dimensions = img.size
         img = img.resize((200, 200), Image.ANTIALIAS)
         self.tk_img = ImageTk.PhotoImage(img)
-        if self.front_cover_img is None:
-            self.front_cover_img = Label(self.front_cover_frame, image=self.tk_img)
+        if self.tk_label_for_img is None:
+            self.tk_label_for_img = Label(self.front_cover_frame, image=self.tk_img)
         else:
-            self.front_cover_img.configure(image=self.tk_img)
-        self.front_cover_img.pack()
+            self.tk_label_for_img.configure(image=self.tk_img)
+        self.tk_label_for_img.pack()
         self.image_description_sv.set("FRONT_COVER: {} x {}".format(original_dimensions[0], original_dimensions[1]))
         self.extract_image_button['state'] = NORMAL
 
     def file_entry_return_key_action(self):
         self.open_mp3_file()
 
-    def open_id3_tag_image_as_file_io(self):
-        self.image_file = None
+    def try_to_open_id3_tag_image_as_file_io(self):
         try:
-            for info in self.audio_file.tag.images:
-                if info.picture_type == ImageFrame.FRONT_COVER:
-                    self.image_file = BytesIO(info.image_data)
-                    break
+            self.open_id3_tag_image_as_file_io()
         except AttributeError:
             pass
+
+    def open_id3_tag_image_as_file_io(self):
+        self.image_file = None
+        for i, info in enumerate(self.audio_file.tag.images):
+            if self.should_display_image(i, info):
+                self.image_file = BytesIO(info.image_data)
+                break
 
     def img_entry_return_key_action(self):
         new_path = self.new_front_cover_sv.get()
@@ -278,23 +340,40 @@ class MainWindow:
 
     def remove_button_action(self):
         self.image_file = None
-        self.clear_image()
-        self.remove_all_images_from_tag()
+        self.clear_image_from_gui()
+        self.remove_all_images_from_id3_tag()
 
-    def remove_all_images_from_tag(self):
-        descriptions = list()
-        for info in self.audio_file.tag.images:
-            descriptions.append(info.description)
-        for description in descriptions:
+    def remove_all_images_from_id3_tag(self):
+        for description in [info.description for info in self.audio_file.tag.images]:
             self.audio_file.tag.images.remove(description)
 
     def put_new_image_into_tag(self):
-        f = self.new_front_cover_sv.get()
-        if isfile(f):
-            mime = Magic(mime=True)
-            mime_type = mime.from_file(f)
+        if isfile(self.new_front_cover_sv.get()):
             image_data = open(self.new_front_cover_sv.get(), 'rb').read()
-            self.audio_file.tag.images.set(ImageFrame.FRONT_COVER, image_data, mime_type)
+            self.audio_file.tag.images.set(ImageFrame.FRONT_COVER, image_data, self.get_new_front_cover_mime_type())
+
+    def should_display_image(self, image_idx, img_info):
+        is_front_cover = img_info.picture_type == ImageFrame.FRONT_COVER
+        is_last_picture = image_idx + 1 == len(self.audio_file.tag.images)
+        return is_front_cover or is_last_picture
+
+    def get_new_front_cover_mime_type(self):
+        mime = Magic(mime=True)
+        return mime.from_file(self.new_front_cover_sv.get())
+
+    def get_initialized_id3_tag(self):
+        assert self.audio_file is not None
+        self.init_id3_tag()
+        assert self.audio_file.tag is not None
+        return self.audio_file.tag
+
+    def gui_fields_to_fld_val(self):
+        for field, _ in self.id3_gui_fields:
+            self.fld_val[field] = str(self.id3_entry[field].get())
+            if len(self.fld_val[field]) == 0 or self.fld_val[field] == "0":
+                self.fld_val[field] = None
+            elif "track" in field:
+                self.fld_val[field] = int(self.fld_val[field])
 
 
 def parse_arguments():
