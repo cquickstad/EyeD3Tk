@@ -234,6 +234,7 @@ class MainWindow:
             self.mp3_file_sv.set("No file selected!")
 
     def load_tag_into_gui(self):
+        self.init_id3_tag()
         self.put_tag_fields_in_gui_entries()
         self.try_to_open_id3_tag_image_as_file_io()
         if self.image_file is None:
@@ -242,10 +243,12 @@ class MainWindow:
             self.display_image_file()
 
     def save_button_action(self):
-
         self.gui_fields_to_fld_val()
 
-        tag = self.get_initialized_id3_tag()
+        for key, val in self.fld_val.items():
+            print(key, ":", val)
+
+        tag = self.audio_file.tag
         tag.version = ID3_DEFAULT_VERSION
 
         # These fields are assigned normally
@@ -261,7 +264,8 @@ class MainWindow:
         # These fields need some converting or special assignments
         tag.genre = Genre(self.fld_val['genre'])
         tag.track_num = (self.fld_val['track_num'], self.fld_val['num_tracks'])
-        tag.comments.set(self.fld_val['comments'])
+        if self.fld_val['comments'] is not None and self.fld_val['comments'] != "":
+            tag.comments.set(self.fld_val['comments'])
 
         tag.save(encoding="utf_8")
 
@@ -281,9 +285,8 @@ class MainWindow:
             self.tk_label_for_img.pack_forget()
 
     def put_tag_fields_in_gui_entries(self):
-        if self.audio_file.tag:
-            self.id3_tag_to_fld_val()
-            self.fld_val_to_gui_fields()
+        self.id3_tag_to_fld_val()
+        self.fld_val_to_gui_fields()
 
     def id3_tag_to_fld_val(self):
         tag = self.audio_file.tag
@@ -296,9 +299,11 @@ class MainWindow:
         self.fld_val['release_date'] = self.tag_to_str(tag.release_date)
         self.fld_val['recording_date'] = self.tag_to_str(tag.recording_date)
 
-        self.fld_val['genre'] = "" if tag.genre is None else tag.genre.name
-        self.fld_val['track_num'] = "" if tag.track_num is None or len(tag.track_num) < 1 else tag.track_num[0]
-        self.fld_val['num_tracks'] = "" if tag.track_num is None or len(tag.track_num) < 2 else tag.track_num[1]
+        self.fld_val['genre'] = "" if tag.genre is None else self.tag_to_str(tag.genre.name)
+        self.fld_val['track_num'] = "" if tag.track_num is None or len(tag.track_num) < 1 \
+            else self.tag_to_str(tag.track_num[0])
+        self.fld_val['num_tracks'] = "" if tag.track_num is None or len(tag.track_num) < 2 \
+            else self.tag_to_str(tag.track_num[1])
         self.id3_comments_to_fld_val()
 
     def tag_to_str(self, tag_element):
@@ -373,19 +378,17 @@ class MainWindow:
         mime = Magic(mime=True)
         return mime.from_file(self.new_front_cover_sv.get())
 
-    def get_initialized_id3_tag(self):
-        assert self.audio_file is not None
-        self.init_id3_tag()
-        assert self.audio_file.tag is not None
-        return self.audio_file.tag
-
     def gui_fields_to_fld_val(self):
         for field, _ in self.id3_gui_fields:
             self.fld_val[field] = str(self.id3_entry[field].get())
-            if len(self.fld_val[field]) == 0 or self.fld_val[field] == "0":
-                self.fld_val[field] = None
-            elif "track" in field:
-                self.fld_val[field] = int(self.fld_val[field])
+            if "track" in field:
+                if self.fld_val[field] in ("0", ""):
+                    self.fld_val[field] = None
+                else:
+                    self.fld_val[field] = int(self.fld_val[field])
+            if "date" in field:
+                if self.fld_val[field] == "":
+                    self.fld_val[field] = None
 
 
 def parse_arguments():
