@@ -46,6 +46,10 @@ class MainWindow:
     img_file_types = [('ID3-Compatible Images', '*.jpg *.JPG *.jpeg *.JPEG *.png *.PNG'),
                       ('All Files', "*")]
 
+    jpg_file_types = [('JPEG Image', '*.jpg *.JPG *.jpeg *.JPEG')]
+
+    png_file_types = [('PNG Image', '*.png *.PNG')]
+
     id3_gui_fields = (('title', "Title:"),
                       ('artist', "Artist:"),
                       ('composer', "Composer:"),
@@ -191,16 +195,24 @@ class MainWindow:
             self.extract_id3_image_to_file(info)
 
     def extract_id3_image_to_file(self, info):
+        def_ext, ftypes = self.get_image_file_extension(info)
         path = filedialog.asksaveasfilename(parent=self.front_cover_frame,
-                                            defaultextension=self.get_image_file_extension(info),
-                                            initialfile=self.get_initial_image_file_name(info))
+                                            defaultextension=def_ext,
+                                            initialfile=self.get_initial_image_file_name(info),
+                                            filetypes=ftypes)
         if path is not None and path != "":
             with open(path, 'wb') as img_file:
                 img_file.write(info.image_data)
 
     def get_image_file_extension(self, info):
         img = Image.open(BytesIO(info.image_data))
-        return "." + str(img.format).lower()
+        default_extension = "." + str(img.format).lower()
+        file_types = []
+        if default_extension == ".jpeg":
+            file_types = self.jpg_file_types
+        elif default_extension == ".png":
+            file_types = self.png_file_types
+        return default_extension, file_types
 
     def get_initial_image_file_name(self, info):
         name = ID3_IMG_TYPES[info.picture_type]
