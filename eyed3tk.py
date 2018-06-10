@@ -52,7 +52,6 @@ class MainWindow:
 
     id3_gui_fields = (('title', "Title:"),
                       ('artist', "Artist:"),
-                      ('composer', "Composer:"),
                       ('album', "Album:"),
                       ('album_artist', "Album Artist:"),
                       ('original_release_date', "Original Release Date:"),
@@ -254,7 +253,6 @@ class MainWindow:
         # These fields are assigned normally
         tag.title = self.fld_val['title']
         tag.artist = self.fld_val['artist']
-        tag.composer = self.fld_val['composer']
         tag.album = self.fld_val['album']
         tag.album_artist = self.fld_val['album_artist']
         tag.original_release_date = self.fld_val['original_release_date']
@@ -292,7 +290,6 @@ class MainWindow:
         tag = self.audio_file.tag
         self.fld_val['title'] = self.tag_to_str(tag.title)
         self.fld_val['artist'] = self.tag_to_str(tag.artist)
-        self.fld_val['composer'] = self.tag_to_str(tag.composer)
         self.fld_val['album'] = self.tag_to_str(tag.album)
         self.fld_val['album_artist'] = self.tag_to_str(tag.album_artist)
         self.fld_val['original_release_date'] = self.tag_to_str(tag.original_release_date)
