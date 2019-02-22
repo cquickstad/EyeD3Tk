@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
 
 
 # EyeD3Tk  <https://github.com/cquickstad/EyeD3Tk>
