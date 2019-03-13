@@ -18,11 +18,11 @@
     "default": {
         "eyed3": {
             "hashes": [
-                "sha256:50cfca2a9b1abaa69bc547a247b32d83dd9f1b3430e955c793455e546f44875e",
-                "sha256:b6bb626566f2949da409d7a871576271e2d6254dfb3d416b21713dabc4b6b00f"
+                "sha256:3e10b7272bfe94948c42ccf4137fc72e333dd03b84b756b3fb646be1dcad9f8d",
+                "sha256:ecd1a3df14c511a2ebaf09b4f04c29e468d65016814767d95daf7f26831562c9"
             ],
             "index": "pypi",
-            "version": "==0.8.9"
+            "version": "==0.8.10"
         },
         "pillow": {
             "hashes": [

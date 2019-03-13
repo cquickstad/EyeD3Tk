@@ -28,7 +28,7 @@ from tkinter import Tk, Label, Button, Entry, Frame, StringVar, filedialog, \
 from PIL import ImageTk, Image
 from io import BytesIO
 from os.path import isfile
-from magic import Magic
+import magic
 
 app_title = "EyeD3Tk"
 
@@ -373,8 +373,8 @@ class MainWindow:
         return is_front_cover or is_last_picture
 
     def get_new_front_cover_mime_type(self):
-        mime = Magic(mime=True)
-        return mime.from_file(self.new_front_cover_sv.get())
+        # return magic.detect_from_filename(self.new_front_cover_sv.get()).mime_type  # older magic version
+        return magic.from_file(self.new_front_cover_sv.get(), mime=True)  # newer magic version
 
     def gui_fields_to_fld_val(self):
         for field, _ in self.id3_gui_fields:
