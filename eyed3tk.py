@@ -321,7 +321,7 @@ class MainWindow:
     def display_image_file(self):
         img = Image.open(self.image_file)
         original_dimensions = img.size
-        img = img.resize((200, 200), Image.ANTIALIAS)
+        img = img.resize((200, 200))
         self.tk_img = ImageTk.PhotoImage(img)
         if self.tk_label_for_img is None:
             self.tk_label_for_img = Label(self.front_cover_frame, image=self.tk_img)
